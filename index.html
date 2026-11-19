@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geovisor Armenia | Laura Karina Luján</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
+    <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root { --primary-color: #1a252f; --accent-color: #e74c3c; --bg-panel: rgba(255, 255, 255, 0.95); }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; overflow: hidden; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
+        #sidebar {
+            position: absolute; top: 0; left: 0; height: 100vh; width: 320px;
+            background: var(--bg-panel); z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column; transition: transform 0.3s ease;
+        }
+        #sidebar.hidden { transform: translateX(-320px); }
+        #toggle-btn {
+            position: absolute; top: 50%; right: -40px; width: 40px; height: 50px; 
+            background: var(--primary-color); color: white; border: none; border-radius: 0 8px 8px 0; 
+            cursor: pointer; font-size: 1.2rem; display: flex; justify-content: center; align-items: center;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2); transform: translateY(-50%);
+        }
+        .sidebar-header { background: var(--primary-color); color: white; padding: 20px; text-align: center; }
+        .sidebar-header h2 { margin: 0; font-size: 1.4rem; }
+        .sidebar-header p { margin: 5px 0 0; font-size: 0.85rem; opacity: 0.8; }
+        .sidebar-content { padding: 20px; overflow-y: auto; flex-grow: 1; }
+        .section-title { color: var(--primary-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 5px; margin-top: 0; font-size: 1.1rem; }
+        .layer-item { display: flex; align-items: center; margin-bottom: 10px; font-size: 0.95rem; }
+        .layer-item input { margin-right: 10px; cursor: pointer; }
+        .color-box { width: 20px; height: 20px; margin-right: 10px; border-radius: 3px; border: 1px solid #ccc; }
+        #coords-panel {
+            position: absolute; bottom: 20px; left: 340px; background: rgba(0,0,0,0.7); color: white; 
+            padding: 5px 15px; border-radius: 4px; font-family: monospace; font-size: 0.9rem; 
+            z-index: 1000; transition: left 0.3s ease;
+        }
+        #sidebar.hidden ~ #coords-panel { left: 20px; }
+        #resultados-panel {
+            margin-top: 15px; padding: 10px; background: #f8f9fa; border-left: 4px solid var(--accent-color);
+            font-size: 0.85rem; max-height: 250px; overflow-y: auto; display: none;
+        }
+        /* Estilo para el popup de la chincheta */
+        .popup-riesgo { font-size: 0.9rem; line-height: 1.4; }
+        .popup-riesgo b { color: #c0392b; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <button id="toggle-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+        <div class="sidebar-header">
+            <h2><i class="fa-solid fa-earth-americas"></i> Geovisor Armenia</h2>
+            <p>Laura Karina Luján Arias</p>
+        </div>
+        <div class="sidebar-content">
+            <h3 class="section-title">Capas del Mapa</h3>
+            <div class="layer-item">
+                <input type="checkbox" id="chk-comunas" checked onchange="toggleCapa('comunas', this.checked)">
+                <div class="color-box" style="background: rgba(52, 152, 219, 0.4); border: 2px solid #3498db;"></div>
+                <label for="chk-comunas">Comunas</label>
+            </div>
+            <div class="layer-item">
+                <input type="checkbox" id="chk-amenaza" onchange="toggleCapa('amenaza', this.checked)">
+                <div class="color-box" style="background: rgba(231, 76, 60, 0.4); border: 1px solid #e74c3c;"></div>
+                <label for="chk-amenaza">Zonas de Amenaza Volcánica</label>
+            </div>
+
+            <h3 class="section-title" style="margin-top: 20px;">Consultas Interactivas</h3>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">Haz clic en una comuna para ver sus barrios y manzanas.</p>
+            <div id="resultados-panel"></div>
+        </div>
+    </div>
+
+    <div id="coords-panel">Lat: 0.00000 | Lon: 0.00000</div>
+    <div id="map"></div>
+
+    <script>
+        // 1. MAPA Y CAPAS BASE
+        var map = L.map('map').setView([4.5338, -75.6811], 12); 
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        var baseMaps = {
+            "Calles (OSM)": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }),
+            "Satélite (Esri)": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' }),
+            "Terreno (OpenTopo)": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '© OpenTopoMap' })
+        };
+        baseMaps["Calles (OSM)"].addTo(map);
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+        // 2. GEOLOCALIZACIÓN
+        L.control.locate({ 
+            position: 'topright', 
+            strings: { title: "Mi ubicación" },
+            icon: 'fa fa-location-arrow',
+            iconElementTag: 'i'
+        }).addTo(map);
+
+        // 3. COORDENADAS DEL CURSOR
+        map.on('mousemove', function(e) {
+            document.getElementById('coords-panel').innerHTML = `Lat: ${e.latlng.lat.toFixed(5)} | Lon: ${e.latlng.lng.toFixed(5)}`;
+        });
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('hidden'); }
+
+        // 4. COLORES ALEATORIOS PARA COMUNAS
+        var coloresComunas = {};
+        function getColor(id) {
+            if (!coloresComunas[id]) {
+                var letters = '0123456789ABCDEF';
+                var color = '#';
+                for (var i = 0; i < 6; i++) { color += letters[Math.floor(Math.random() * 16)]; }
+                coloresComunas[id] = color;
+            }
+            return coloresComunas[id];
+        }
+
+        var capasCargadas = { comunas: null, amenaza: null };
+        var comunaSeleccionadaId = null;
+        var comunaSeleccionadaNombre = "";
+
+        // 5. CARGAR COMUNAS
+        fetch('http://127.0.0.1:8000/comunas')
+            .then(res => res.json())
+            .then(data => {
+                capasCargadas.comunas = L.geoJSON(data, {
+                    style: function(feature) {
+                        return { color: "#333", weight: 1, fillOpacity: 0.6, fillColor: getColor(feature.properties.id) };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.on('mouseover', function() { this.setStyle({ weight: 3, color: '#000' }); });
+                        layer.on('mouseout', function() { capasCargadas.comunas.resetStyle(this); });
+                        
+                        layer.on('click', function(e) {
+                            comunaSeleccionadaId = feature.properties.id;
+                            comunaSeleccionadaNombre = feature.properties.nombre;
+                            
+                            layer.bindPopup(`<b>Comuna ${comunaSeleccionadaId}:</b> ${comunaSeleccionadaNombre}`).openPopup();
+                            consultarBarriosYManzanas(comunaSeleccionadaId, comunaSeleccionadaNombre);
+                            
+                            L.DomEvent.stopPropagation(e);
+                        });
+                    }
+                }).addTo(map);
+            })
+            .catch(err => console.error("Error cargando comunas:", err));
+
+        // 6. CARGAR AMENAZAS
+        function toggleCapa(nombre, estado) {
+            if (estado) {
+                if (!capasCargadas[nombre] && nombre === 'amenaza') {
+                    fetch('http://127.0.0.1:8000/amenazas')
+                        .then(res => res.json())
+                        .then(data => {
+                            capasCargadas.amenaza = L.geoJSON(data, { 
+                                style: function(feature) {
+                                    let nivel = feature.properties.nivel ? feature.properties.nivel.toLowerCase() : "";
+                                    // Colores de amenaza
+                                    let color = nivel.includes('alta') ? "#d35400" : (nivel.includes('media') ? "#f39c12" : "#f1c40f"); 
+                                    return { color: "#fff", weight: 1, fillOpacity: 0.5, fillColor: color };
+                                },
+                                onEachFeature: function(f, l) { 
+                                    // Popup de la capa de amenaza
+                                    l.bindPopup(`
+                                        <div class="popup-riesgo">
+                                            <b>${f.properties.volcan}</b><br>
+                                            <b>Nivel:</b> ${f.properties.nivel}<br>
+                                            <b>Categoría:</b> ${f.properties.fenomeno}
+                                        </div>
+                                    `); 
+                                }
+                            }).addTo(map);
+                        })
+                        .catch(err => console.error("Error cargando amenazas:", err));
+                } else if (capasCargadas[nombre]) {
+                    map.addLayer(capasCargadas[nombre]);
+                }
+            } else {
+                if (capasCargadas[nombre]) map.removeLayer(capasCargadas[nombre]);
+            }
+        }
+
+        // 7. CONSULTA DE BARRIOS Y MANZANAS (Barra lateral)
+        function consultarBarriosYManzanas(id, nombre) {
+            const panel = document.getElementById('resultados-panel');
+            panel.style.display = 'block';
+            panel.innerHTML = "<i>Cargando información...</i>";
+
+            Promise.all([
+                fetch(`http://127.0.0.1:8000/barrios/${id}`).then(res => res.json()),
+                fetch(`http://127.0.0.1:8000/comunas/${id}/manzanas`).then(res => res.json())
+            ])
+            .then(([dataBarrios, dataManzanas]) => {
+                let listaHtml = "<ul style='padding-left: 15px; margin-top: 5px;'>";
+                if(dataBarrios.lista_barrios.length > 0) {
+                    dataBarrios.lista_barrios.forEach(b => { listaHtml += `<li>${b}</li>`; });
+                } else {
+                    listaHtml += "<li>No hay barrios registrados.</li>";
+                }
+                listaHtml += "</ul>";
+
+                panel.innerHTML = `
+                    <h4 style="margin: 0 0 5px 0;">${nombre}</h4>
+                    <p style="margin: 0 0 5px 0;"><b>Manzanas:</b> ${dataManzanas.total_manzanas}</p>
+                    <p style="margin: 0;"><b>Barrios:</b></p>
+                    ${listaHtml}
+                `;
+            })
+            .catch(err => {
+                panel.innerHTML = "<span style='color:red;'>Error al conectar con el servidor.</span>";
+                console.error("Error en consulta:", err);
+            });
+        }
+
+        // 8. CHINCHETA SIMPLE (Consulta de riesgo con Categoría Específica)
+        var marcadorSeleccionado = null;
+        
+        map.on('click', function(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+
+            if (e.originalEvent.target.classList.contains('leaflet-interactive')) {
+                return; 
+            }
+
+            if (marcadorSeleccionado) {
+                map.removeLayer(marcadorSeleccionado);
+            }
+
+            marcadorSeleccionado = L.marker([lat, lng]).addTo(map);
+            evaluarRiesgoEnPunto(lat, lng);
+        });
+
+                function evaluarRiesgoEnPunto(lat, lng) {
+            document.getElementById('coords-panel').innerHTML = `Punto: Lat: ${lat.toFixed(5)} | Lon: ${lng.toFixed(5)}`;
+            
+            fetch(`http://127.0.0.1:8000/riesgo?lon=${lng}&lat=${lat}`)
+                .then(res => res.json())
+                .then(data => {
+                    let mensaje = "";
+                    
+                    if (data.mensaje) {
+                        // Si el punto está fuera de Armenia o la comuna no tiene amenaza
+                        mensaje = `<div class="popup-riesgo">
+                                     <b>Ubicación:</b> ${data.comuna ? data.comuna : 'Fuera de Armenia'}<br>
+                                     <span style="color: #27ae60;">${data.mensaje}</span>
+                                   </div>`;
+                    } else {
+                        // Si encontramos amenaza en la comuna
+                        mensaje = `<div class="popup-riesgo">
+                                     <b>Comuna:</b> ${data.comuna}<br>
+                                     <hr style="margin: 5px 0;">
+                                     <b>${data.volcan}</b><br>
+                                     <b>Grado de amenaza:</b> ${data.nivel}<br>
+                                     <b>Categoría específica:</b> ${data.fenomeno}
+                                   </div>`;
+                    }
+                    
+                    if (marcadorSeleccionado) marcadorSeleccionado.bindPopup(mensaje).openPopup();
+                })
+                .catch(err => {
+                    console.error(err);
+                    if (marcadorSeleccionado) marcadorSeleccionado.bindPopup("Error al consultar el riesgo.").openPopup();
+                });
+        }
+    </script>
+</body>
+</html>
