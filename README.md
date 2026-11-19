@@ -14,7 +14,7 @@ Los datos utilizados en este geovisor provienen exclusivamente de fuentes oficia
 - **Datos Espaciales (Geometrías):** Los polígonos de comunas, manzanas y las zonas de amenaza volcánica fueron descargados de la plataforma **Colombia en Mapas** (Infraestructura Colombiana de Datos Espaciales - ICDE).
 - **Datos Alfanuméricos (Atributos):** La tabla con los nombres de los barrios fue obtenida del **SIG Quindío** (Sistema de Información Geográfica Departamental).
 - **Integración de datos:** La relación entre las manzanas y los barrios se realizó mediante consultas SQL (`JOIN` con conversión de tipo `CAST`) directamente en el backend (FastAPI + Psycopg2), permitiendo unir la información geográfica con los atributos alfanuméricos sin depender de cruces manuales en QGIS.
-- Para más detalles sobre la obtención, preparación y carga de los datos a PostGIS, consulte el archivo proceso_carga.md.
+- Para más detalles sobre la obtención, preparación y carga de los datos a PostGIS, consulte el archivo [proceso_carga.md](https://github.com/KARILUJAN/geovisor-armenia-sig/blob/main/proceso_carga.md).
 
 ## 3. Arquitectura de la Aplicación
 El proyecto sigue una arquitectura cliente-servidor:
