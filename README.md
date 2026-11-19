@@ -76,3 +76,13 @@ Ejemplo de flujo de una consulta:
 4. PostGIS responde si el punto está dentro de los límites y qué amenaza le corresponde.
 5. El Backend formatea el resultado en `JSON` y lo devuelve.
 6. Leaflet recibe el `JSON` y renderiza un popup (chincheta) con los datos exactos: *"Comuna: Quimbaya, Amenaza Alta, Categoría: Flujo de piroclastos"*.
+
+## 7. Evidencias Técnicas
+Las capturas de pantalla que demuestran el funcionamiento del visor se encuentran en la carpeta [`evidencias/`](./evidencias) de este repositorio. 
+
+Allí podrá encontrar:
+1. Visualización de la capa de comunas y consulta de barrios en la barra lateral.
+2. Popup con la consulta espacial de amenaza volcánica (Volcán Cerro Machín).
+3. Validación de puntos fuera de los límites del municipio.
+4. Diagrama Entidad-Relación (ERD) demostrando las llaves foráneas.
+5. Consulta SQL directa en PostgreSQL verificando las llaves primarias y foráneas.
